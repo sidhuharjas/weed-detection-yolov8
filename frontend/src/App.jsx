@@ -46,8 +46,7 @@ export default function App() {
   const checkBackend = useCallback(async () => {
     try {
       const r = await fetch(BACKEND + "/", { signal: AbortSignal.timeout(3000) });
-      if (r.ok) setBackendOk(true);
-      else setBackendOk(false);
+      setBackendOk(r.ok);
     } catch {
       setBackendOk(false);
     }
