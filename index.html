@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgroVision — Crop & Weed Detection</title>
+<style>
+/* ── Reset & base ─────────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f5f3;--surface:#ffffff;--surface2:#f0f0ee;--border:#e0e0dd;
+  --text:#1a1a18;--text2:#666660;--text3:#999993;
+  --green:#3B6D11;--green-light:#eaf3de;--green-mid:#639922;
+  --red:#A32D2D;--red-light:#fcebeb;--red-mid:#E24B4A;
+  --blue:#185FA5;--blue-light:#e6f1fb;
+  --radius:8px;--radius-lg:12px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+
+/* ── Layout ───────────────────────────────────────────────────────── */
+.app{display:grid;grid-template-columns:260px 1fr 280px;min-height:100vh}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.main{display:flex;flex-direction:column;background:var(--bg)}
+.results{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+
+/* ── Sidebar sections ─────────────────────────────────────────────── */
+.s-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.s-head h1{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.section{padding:14px 16px;border-bottom:1px solid var(--border)}
+.sec-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px}
+
+/* ── Status dot ───────────────────────────────────────────────────── */
+.status{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.dot.online{background:#3B6D11} .dot.offline{background:#E24B4A} .dot.checking{background:#BA7517}
+
+/* ── Upload zone ──────────────────────────────────────────────────── */
+.drop-zone{border:1.5px dashed var(--border);border-radius:var(--radius);padding:22px 14px;text-align:center;cursor:pointer;transition:all .15s;background:var(--surface2)}
+.drop-zone:hover,.drop-zone.over{border-color:var(--blue);background:var(--blue-light)}
+.drop-zone svg{display:block;margin:0 auto 8px;opacity:.4}
+.drop-zone p{font-size:12px;color:var(--text2);line-height:1.4}
+.drop-zone small{font-size:11px;color:var(--text3);display:block;margin-top:3px}
+.file-pill{margin-top:8px;padding:7px 10px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border);display:none;align-items:center;gap:8px}
+.file-pill.show{display:flex}
+.file-pill span{font-size:12px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-pill small{font-size:11px;color:var(--text3);white-space:nowrap}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 12px;border-radius:var(--radius);border:1px solid var(--border);background:transparent;font-size:12px;font-weight:500;color:var(--text);cursor:pointer;width:100%;transition:background .12s,transform .08s}
+.btn:hover:not(:disabled){background:var(--surface2)}
+.btn:active:not(:disabled){transform:scale(.98)}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn-run{background:var(--green);border-color:var(--green);color:#fff;font-size:13px;padding:9px 12px;margin-top:10px}
+.btn-run:hover:not(:disabled){background:#27500A}
+.btn-sm{padding:5px 10px;font-size:11px;width:auto}
+
+/* ── Settings ─────────────────────────────────────────────────────── */
+.setting{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.setting:last-child{margin-bottom:0}
+.setting label{font-size:12px;color:var(--text2);display:flex;justify-content:space-between;align-items:center}
+.setting label b{font-weight:600;color:var(--text);font-size:12px}
+.setting input[type=range]{width:100%;accent-color:var(--green)}
+.setting select{width:100%;font-size:12px;padding:6px 8px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.toggle-row:last-child{margin-bottom:0}
+.toggle-row span{font-size:12px;color:var(--text2)}
+.toggle{position:relative;width:32px;height:18px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.tslider{position:absolute;inset:0;cursor:pointer;background:#ccc;border-radius:9px;transition:.2s}
+.tslider:before{position:absolute;content:'';height:12px;width:12px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked+.tslider{background:var(--green)}
+.toggle input:checked+.tslider:before{transform:translateX(14px)}
+
+/* ── Main area ────────────────────────────────────────────────────── */
+.toolbar{padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:8px}
+.toolbar-title{font-size:13px;font-weight:600;flex:1}
+.tab{padding:5px 10px;border-radius:var(--radius);border:1px solid transparent;font-size:12px;cursor:pointer;background:transparent;color:var(--text2)}
+.tab.active{border-color:var(--border);color:var(--text);background:var(--surface2)}
+
+.canvas-area{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;min-height:360px;position:relative}
+.canvas-wrap{position:relative;display:inline-block;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:0 2px 12px rgba(0,0,0,.06)}
+canvas{display:block;max-width:100%;max-height:420px}
+.placeholder{text-align:center;color:var(--text3)}
+.placeholder svg{display:block;margin:0 auto 12px;opacity:.3}
+.placeholder p{font-size:13px}
+
+/* ── Inference overlay ────────────────────────────────────────────── */
+.inf-overlay{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,.42);border-radius:var(--radius)}
+.inf-overlay.show{display:flex}
+.spinner{width:28px;height:28px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.inf-text{font-size:13px;color:#fff;font-weight:500}
+.inf-bar-wrap{width:160px;height:4px;background:rgba(255,255,255,.2);border-radius:2px;overflow:hidden}
+.inf-bar{height:100%;background:#fff;width:0;transition:width .25s}
+
+/* ── Error banner ─────────────────────────────────────────────────── */
+.error{margin:10px 16px;padding:10px 12px;background:var(--red-light);border:1px solid #f7c1c1;border-radius:var(--radius);display:none;align-items:center;gap:8px}
+.error.show{display:flex}
+.error p{font-size:12px;color:var(--red);flex:1}
+
+/* ── Export bar ───────────────────────────────────────────────────── */
+.export-bar{padding:10px 16px;border-top:1px solid var(--border);background:var(--surface);display:flex;gap:6px;flex-wrap:wrap}
+.export-bar .btn{flex:1;min-width:90px}
+
+/* ── Timeline ─────────────────────────────────────────────────────── */
+#timelineWrap{width:100%;padding:16px}
+#timelineCanvas{width:100%;height:180px;border-radius:var(--radius);border:1px solid var(--border)}
+
+/* ── Results panel ────────────────────────────────────────────────── */
+.r-head{padding:14px 16px;border-bottom:1px solid var(--border)}
+.r-head h2{font-size:13px;font-weight:600}
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.metric{background:var(--surface2);border-radius:var(--radius);padding:10px 12px}
+.metric .lbl{font-size:11px;color:var(--text3);margin-bottom:4px}
+.metric .val{font-size:22px;font-weight:600;color:var(--text)}
+.metric .sub{font-size:11px;color:var(--text3);margin-top:2px}
+.metric.crop .val{color:var(--green)}
+.metric.weed .val{color:var(--red)}
+
+.det-list{flex:1;overflow-y:auto;padding:14px 16px}
+.det-empty{text-align:center;padding:24px 0;color:var(--text3)}
+.det-empty svg{display:block;margin:0 auto 8px;opacity:.3}
+.det-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)}
+.det-item:last-child{border-bottom:none}
+.det-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.det-dot.crop{background:var(--green-mid)} .det-dot.weed{background:var(--red-mid)}
+.det-body{flex:1;min-width:0}
+.det-name{font-size:12px;font-weight:600}
+.det-bar{height:3px;border-radius:2px;margin-top:4px}
+.det-bar.crop{background:var(--green-mid)} .det-bar.weed{background:var(--red-mid)}
+.det-conf{font-size:11px;color:var(--text2);white-space:nowrap}
+
+.history-section{padding:14px 16px;border-top:1px solid var(--border)}
+.hist-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;background:var(--surface);margin-bottom:6px}
+.hist-item:last-child{margin-bottom:0}
+.hist-item:hover{background:var(--surface2)}
+.hist-thumb{width:32px;height:32px;border-radius:4px;background:var(--surface2);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.hist-thumb img{width:100%;height:100%;object-fit:cover}
+.hist-info{flex:1;min-width:0}
+.hist-name{font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-time{font-size:10px;color:var(--text3)}
+.hist-badge{font-size:10px;padding:2px 6px;border-radius:var(--radius);background:var(--surface2);color:var(--text2);white-space:nowrap}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}
+  .sidebar,.results{border:none;border-bottom:1px solid var(--border)}
+  .canvas-area{min-height:240px;padding:12px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ════════════════════════ SIDEBAR ════════════════════════ -->
+<div class="sidebar">
+
+  <div class="s-head">
+    <h1>AgroVision</h1>
+    <div class="status" id="statusLabel">
+      <span class="dot checking" id="statusDot"></span>
+      <span id="statusText">Checking...</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">Input</div>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p>Drop image here or click to upload</p>
+      <small>JPG, PNG — max 50 MB</small>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+    <div class="file-pill" id="filePill">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 13h4"/></svg>
+      <span id="fileName">—</span>
+      <small id="fileSize">—</small>
+    </div>
+    <div class="error" id="errorBanner"><p id="errorText">Error</p></div>
+    <button class="btn btn-run" id="runBtn" disabled onclick="runInference()">
+      Run inference
+    </button>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">Model</div>
+    <div class="setting">
+      <label>Architecture</label>
+      <select id="modelSel">
+        <option value="yolov8n">YOLOv8n (fastest)</option>
+        <option value="yolov8s">YOLOv8s</option>
+        <option value="yolov8m" selected>YOLOv8m</option>
+        <option value="yolov8l">YOLOv8l</option>
+        <option value="yolov8x">YOLOv8x (most accurate)</option>
+      </select>
+    </div>
+    <div class="setting">
+      <label>Confidence threshold <b id="confVal">0.45</b></label>
+      <input type="range" min="1" max="99" value="45" id="confSlider" step="1">
+    </div>
+    <div class="setting">
+      <label>IoU threshold <b id="iouVal">0.45</b></label>
+      <input type="range" min="1" max="90" value="45" id="iouSlider" step="1">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-label">SAHI settings</div>
+    <div class="toggle-row">
+      <span>Enable SAHI slicing</span>
+      <label class="toggle"><input type="checkbox" id="togSahi" checked><span class="tslider"></span></label>
+    </div>
+    <div id="sahiControls">
+      <div class="setting" style="margin-top:10px">
+        <label>Slice size <b id="sliceVal">512 px</b></label>
+        <input type="range" min="128" max="1024" value="512" id="sliceSlider" step="64">
+      </div>
+      <div class="setting">
+        <label>Overlap ratio <b id="overlapVal">0.20</b></label>
+        <input type="range" min="0" max="50" value="20" id="overlapSlider" step="1">
+      </div>
+    </div>
+  </div>
+
+  <div class="section" style="flex:1">
+    <div class="sec-label">Visualisation</div>
+    <div class="toggle-row">
+      <span>Bounding boxes</span>
+      <label class="toggle"><input type="checkbox" id="togBoxes" checked onchange="redraw()"><span class="tslider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <span>Confidence labels</span>
+      <label class="toggle"><input type="checkbox" id="togConf" checked onchange="redraw()"><span class="tslider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <span>Weeds only</span>
+      <label class="toggle"><input type="checkbox" id="togWeeds" onchange="redraw()"><span class="tslider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <span>Heatmap overlay</span>
+      <label class="toggle"><input type="checkbox" id="togHeat" onchange="redraw()"><span class="tslider"></span></label>
+    </div>
+    <div class="setting" style="margin-top:10px">
+      <label>Heatmap opacity <b id="heatVal">0.55</b></label>
+      <input type="range" min="10" max="90" value="55" id="heatSlider" step="1"
+             oninput="document.getElementById('heatVal').textContent=(this.value/100).toFixed(2);redraw()">
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+
+<!-- ════════════════════════ MAIN ════════════════════════ -->
+<div class="main">
+
+  <div class="toolbar">
+    <span class="toolbar-title">Detection canvas</span>
+    <button class="tab active" id="tabImage" onclick="setTab('image')">Image</button>
+    <button class="tab" id="tabTimeline" onclick="setTab('timeline')">Timeline</button>
+  </div>
+
+  <div class="canvas-area" id="canvasArea">
+    <div class="placeholder" id="placeholder">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/><path d="M12 6v2M12 11h.01M8 16s1-2 4-2 4 2 4 2"/></svg>
+      <p>Upload an image and run inference to see detections</p>
+    </div>
+    <div class="canvas-wrap" id="canvasWrap" style="display:none">
+      <canvas id="mainCanvas"></canvas>
+      <div class="inf-overlay" id="inferenceOverlay">
+        <div class="spinner"></div>
+        <div class="inf-text" id="infText">Running inference...</div>
+        <div class="inf-bar-wrap"><div class="inf-bar" id="infBar"></div></div>
+      </div>
+    </div>
+    <div id="timelineWrap" style="display:none">
+      <canvas id="timelineCanvas"></canvas>
+      <p style="text-align:center;font-size:11px;color:var(--text3);margin-top:8px">
+        Weed and crop count per inference run
+      </p>
+    </div>
+  </div>
+
+  <div class="export-bar">
+    <button class="btn" id="dlImage" onclick="downloadAnnotated()" disabled>Download annotated image</button>
+    <button class="btn" id="dlJSON"  onclick="downloadJSON()"      disabled>Download JSON</button>
+    <button class="btn" id="dlCSV"   onclick="downloadCSV()"       disabled>Download CSV</button>
+    <button class="btn" id="dlHeat"  onclick="downloadHeatmap()"   disabled>Download heatmap</button>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ════════════════════════ RESULTS ════════════════════════ -->
+<div class="results">
+
+  <div class="r-head"><h2>Inference results</h2></div>
+
+  <div class="metric-grid">
+    <div class="metric"><div class="lbl">Total detections</div><div class="val" id="mTotal">—</div></div>
+    <div class="metric"><div class="lbl">Inference time</div><div class="val" id="mTime">—</div><div class="sub">seconds</div></div>
+    <div class="metric crop"><div class="lbl">Crops</div><div class="val" id="mCrops">—</div><div class="sub" id="mCropPct"></div></div>
+    <div class="metric weed"><div class="lbl">Weeds</div><div class="val" id="mWeeds">—</div><div class="sub" id="mWeedPct"></div></div>
+  </div>
+
+  <div class="det-list" id="detList">
+    <div class="det-empty">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p style="font-size:12px">No detections yet</p>
+    </div>
+  </div>
+
+  <div class="history-section">
+    <div class="sec-label">Recent runs</div>
+    <div id="historyList"><p style="font-size:11px;color:var(--text3)">No history yet</p></div>
+  </div>
+
+</div><!-- /results -->
+</div><!-- /app -->
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   CONFIGURATION — update BACKEND_URL if you change port in app.py
+═══════════════════════════════════════════════════════════════ */
+const BACKEND_URL = "http://localhost:5000";   // <-- matches PORT in app.py
+
+/* ═══════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════ */
+const S = {
+  file: null,
+  imgEl: null,
+  detections: [],
+  annotatedSrc: null,
+  running: false,
+  history: [],
+  tab: "image",
+  historyStats: [],   // [{crops, weeds, label}] for timeline
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   SLIDER BINDINGS
+═══════════════════════════════════════════════════════════════ */
+document.getElementById("confSlider").oninput = function(){
+  document.getElementById("confVal").textContent = (this.value/100).toFixed(2);
+};
+document.getElementById("iouSlider").oninput = function(){
+  document.getElementById("iouVal").textContent = (this.value/100).toFixed(2);
+};
+document.getElementById("sliceSlider").oninput = function(){
+  document.getElementById("sliceVal").textContent = this.value + " px";
+};
+document.getElementById("overlapSlider").oninput = function(){
+  document.getElementById("overlapVal").textContent = (this.value/100).toFixed(2);
+};
+document.getElementById("togSahi").onchange = function(){
+  document.getElementById("sahiControls").style.display = this.checked ? "" : "none";
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   FILE UPLOAD
+═══════════════════════════════════════════════════════════════ */
+const dz = document.getElementById("dropZone");
+dz.addEventListener("dragover",  e => { e.preventDefault(); dz.classList.add("over"); });
+dz.addEventListener("dragleave", () => dz.classList.remove("over"));
+dz.addEventListener("drop", e => {
+  e.preventDefault(); dz.classList.remove("over");
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+document.getElementById("fileInput").onchange = function(){
+  if (this.files[0]) handleFile(this.files[0]);
+};
+
+function handleFile(f){
+  showError("");
+  if (!/^image\//.test(f.type)){
+    showError("Invalid file type. Please upload a JPG or PNG image."); return;
+  }
+  S.file = f;
+  document.getElementById("fileName").textContent = f.name;
+  document.getElementById("fileSize").textContent  = (f.size/1048576).toFixed(1) + " MB";
+  document.getElementById("filePill").classList.add("show");
+  document.getElementById("runBtn").disabled = false;
+
+  const r = new FileReader();
+  r.onload = e => {
+    const img = new Image();
+    img.onload = () => { S.imgEl = img; showCanvas(); drawImageOnly(); };
+    img.src = e.target.result;
+  };
+  r.readAsDataURL(f);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INFERENCE — calls your Flask backend
+═══════════════════════════════════════════════════════════════ */
+async function runInference(){
+  if (S.running || !S.file) return;
+  S.running = true;
+  document.getElementById("runBtn").disabled = true;
+  showError("");
+
+  const overlay = document.getElementById("inferenceOverlay");
+  const bar     = document.getElementById("infBar");
+  const txt     = document.getElementById("infText");
+
+  showCanvas();
+  overlay.classList.add("show");
+  bar.style.width = "0%";
+
+  // Animate progress bar while waiting
+  const steps = [
+    [10,  "Uploading image..."],
+    [30,  "Loading model weights..."],
+    [55,  "Running SAHI slicing..."],
+    [78,  "YOLOv8 inference..."],
+    [90,  "Post-processing NMS..."],
+  ];
+  let si = 0;
+  const tick = setInterval(() => {
+    if (si < steps.length){
+      bar.style.width  = steps[si][0] + "%";
+      txt.textContent  = steps[si][1];
+      si++;
+    }
+  }, 400);
+
+  try {
+    const fd = new FormData();
+    fd.append("image",      S.file);
+    fd.append("conf",       (document.getElementById("confSlider").value / 100).toFixed(2));
+    fd.append("iou",        (document.getElementById("iouSlider").value  / 100).toFixed(2));
+    fd.append("slice_size", document.getElementById("sliceSlider").value);
+    fd.append("overlap",    (document.getElementById("overlapSlider").value / 100).toFixed(2));
+
+    const resp = await fetch(BACKEND_URL + "/predict", {
+      method: "POST", body: fd, signal: AbortSignal.timeout(120000),
+    });
+
+    clearInterval(tick);
+
+    if (!resp.ok){
+      const err = await resp.json().catch(() => ({error: "Unknown server error"}));
+      throw new Error(err.error || "Server returned " + resp.status);
+    }
+
+    bar.style.width = "100%";
+    txt.textContent = "Done";
+
+    const data = await resp.json();
+    S.detections   = data.detections   || [];
+    S.annotatedSrc = data.annotated_image;
+
+    setTimeout(() => {
+      overlay.classList.remove("show");
+      finishInference(data);
+    }, 300);
+
+  } catch (err) {
+    clearInterval(tick);
+    overlay.classList.remove("show");
+    showError("Inference failed: " + err.message + ". Is the backend running?");
+    document.getElementById("runBtn").disabled = false;
+    S.running = false;
+  }
+}
+
+function finishInference(data){
+  S.running = false;
+  document.getElementById("runBtn").disabled = false;
+
+  // Load annotated image from backend onto canvas
+  if (S.annotatedSrc){
+    const img = new Image();
+    img.onload = () => {
+      S.imgEl = img;
+      drawImageOnly();
+      redraw();
+    };
+    img.src = S.annotatedSrc;
+  } else {
+    redraw();
+  }
+
+  updateMetrics(data);
+  updateDetList();
+  enableExport();
+  addHistory(data);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CANVAS DRAWING
+═══════════════════════════════════════════════════════════════ */
+function showCanvas(){
+  document.getElementById("placeholder").style.display  = "none";
+  document.getElementById("canvasWrap").style.display   = "inline-block";
+  document.getElementById("timelineWrap").style.display = "none";
+}
+
+function drawImageOnly(){
+  if (!S.imgEl) return;
+  const cv  = document.getElementById("mainCanvas");
+  const mw  = 640, mh = 480;
+  const sc  = Math.min(mw / S.imgEl.width, mh / S.imgEl.height, 1);
+  cv.width  = Math.round(S.imgEl.width  * sc);
+  cv.height = Math.round(S.imgEl.height * sc);
+  cv.getContext("2d").drawImage(S.imgEl, 0, 0, cv.width, cv.height);
+}
+
+function redraw(){
+  if (!S.imgEl) return;
+  drawImageOnly();
+  if (!S.detections.length) return;
+
+  const cv  = document.getElementById("mainCanvas");
+  const ctx = cv.getContext("2d");
+  const W   = cv.width, H = cv.height;
+
+  const showBoxes  = document.getElementById("togBoxes").checked;
+  const showConf   = document.getElementById("togConf").checked;
+  const weedsOnly  = document.getElementById("togWeeds").checked;
+  const showHeat   = document.getElementById("togHeat").checked;
+  const threshold  = document.getElementById("confSlider").value / 100;
+
+  const visible = S.detections.filter(d =>
+    d.confidence >= threshold && (!weedsOnly || d.class_name === "weed")
+  );
+
+  if (showHeat) drawHeatmap(ctx, W, H, visible);
+  if (showBoxes) visible.forEach(d => drawBox(ctx, W, H, d, showConf));
+}
+
+function drawBox(ctx, W, H, d, showConf){
+  const x = d.x * W, y = d.y * H, w = d.w * W, h = d.h * H;
+  const color = d.class_name === "crop" ? "#639922" : d.class_name === "weed" ? "#E24B4A" : "#888888";
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+  if (showConf){
+    const label = d.class_name + " " + Math.round(d.confidence * 100) + "%";
+    ctx.font = "bold 11px sans-serif";
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y - 18, tw + 8, 18);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(label, x + 4, y - 5);
+  }
+}
+
+function drawHeatmap(ctx, W, H, dets){
+  const opacity  = document.getElementById("heatSlider").value / 100;
+  const off      = document.createElement("canvas");
+  off.width = W; off.height = H;
+  const oc = off.getContext("2d");
+  dets.filter(d => d.class_name === "weed").forEach(d => {
+    const cx = (d.x + d.w / 2) * W, cy = (d.y + d.h / 2) * H;
+    const r  = Math.max(d.w, d.h) * W * 1.8;
+    const g  = oc.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0,   "rgba(226,75,74,0.6)");
+    g.addColorStop(0.5, "rgba(239,159,39,0.25)");
+    g.addColorStop(1,   "rgba(0,0,0,0)");
+    oc.fillStyle = g; oc.fillRect(0, 0, W, H);
+  });
+  ctx.save(); ctx.globalAlpha = opacity; ctx.drawImage(off, 0, 0); ctx.restore();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════════════════════ */
+function setTab(t){
+  S.tab = t;
+  document.getElementById("tabImage").classList.toggle("active",    t === "image");
+  document.getElementById("tabTimeline").classList.toggle("active", t === "timeline");
+  if (t === "image"){
+    showCanvas();
+    if (S.detections.length) redraw();
+  } else {
+    document.getElementById("canvasWrap").style.display   = "none";
+    document.getElementById("placeholder").style.display  = "none";
+    document.getElementById("timelineWrap").style.display = "block";
+    drawTimeline();
+  }
+}
+
+function drawTimeline(){
+  const cv = document.getElementById("timelineCanvas");
+  cv.width  = cv.offsetWidth || 560; cv.height = 180;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+
+  if (!S.historyStats.length){
+    ctx.font = "13px sans-serif"; ctx.fillStyle = "#aaa"; ctx.textAlign = "center";
+    ctx.fillText("Run at least one inference to see the timeline", cv.width/2, cv.height/2);
+    return;
+  }
+
+  const pad = {t:20, r:16, b:32, l:36};
+  const W   = cv.width - pad.l - pad.r;
+  const H   = cv.height - pad.t - pad.b;
+  const n   = S.historyStats.length;
+  const maxV = Math.max(...S.historyStats.map(s => Math.max(s.crops, s.weeds))) + 1;
+
+  const xs = i => pad.l + (n <= 1 ? W/2 : i * W / (n-1));
+  const ys = v => pad.t + H - (v / maxV) * H;
+
+  // Gridlines
+  ctx.strokeStyle = "rgba(0,0,0,.07)"; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++){
+    const y = pad.t + i * H / 4;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + W, y); ctx.stroke();
+    ctx.font = "9px sans-serif"; ctx.fillStyle = "#aaa"; ctx.textAlign = "right";
+    ctx.fillText(Math.round(maxV - i * maxV / 4), pad.l - 4, y + 3);
+  }
+
+  function line(key, color){
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1.8;
+    S.historyStats.forEach((s, i) => i === 0 ? ctx.moveTo(xs(i), ys(s[key])) : ctx.lineTo(xs(i), ys(s[key])));
+    ctx.stroke();
+    S.historyStats.forEach((s, i) => {
+      ctx.beginPath(); ctx.arc(xs(i), ys(s[key]), 4, 0, Math.PI*2);
+      ctx.fillStyle = color; ctx.fill();
+    });
+  }
+
+  line("crops", "#639922"); line("weeds", "#E24B4A");
+
+  // Labels
+  ctx.font = "10px sans-serif"; ctx.textAlign = "left";
+  ctx.fillStyle = "#639922"; ctx.fillRect(pad.l, pad.t - 14, 14, 3); ctx.fillText("Crops", pad.l + 18, pad.t - 11);
+  ctx.fillStyle = "#E24B4A"; ctx.fillRect(pad.l + 60, pad.t - 14, 14, 3); ctx.fillText("Weeds", pad.l + 78, pad.t - 11);
+
+  // X labels
+  S.historyStats.forEach((s, i) => {
+    ctx.fillStyle = "#aaa"; ctx.textAlign = "center";
+    ctx.fillText(s.label, xs(i), pad.t + H + 18);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   METRICS + DETECTION LIST
+═══════════════════════════════════════════════════════════════ */
+function updateMetrics(data){
+  const dets  = data.detections || [];
+  const crops = dets.filter(d => d.class_name === "crop").length;
+  const weeds = dets.filter(d => d.class_name === "weed").length;
+  document.getElementById("mTotal").textContent = dets.length;
+  document.getElementById("mTime").textContent  = data.inference_time || "—";
+  document.getElementById("mCrops").textContent = crops;
+  document.getElementById("mWeeds").textContent = weeds;
+  document.getElementById("mCropPct").textContent = dets.length ? Math.round(crops/dets.length*100)+"% of total" : "";
+  document.getElementById("mWeedPct").textContent = dets.length ? Math.round(weeds/dets.length*100)+"% of total" : "";
+}
+
+function updateDetList(){
+  const threshold = document.getElementById("confSlider").value / 100;
+  const vis = S.detections.filter(d => d.confidence >= threshold).sort((a,b) => b.confidence - a.confidence);
+  const dl = document.getElementById("detList");
+  if (!vis.length){
+    dl.innerHTML = `<div class="det-empty"><p style="font-size:12px">No detections above threshold</p></div>`;
+    return;
+  }
+  dl.innerHTML = vis.map(d => `
+    <div class="det-item">
+      <span class="det-dot ${d.class_name}"></span>
+      <div class="det-body">
+        <div class="det-name">${d.class_name.charAt(0).toUpperCase()+d.class_name.slice(1)} #${d.id}</div>
+        <div class="det-bar ${d.class_name}" style="width:${Math.round(d.confidence*100)}%"></div>
+      </div>
+      <span class="det-conf">${Math.round(d.confidence*100)}%</span>
+    </div>`).join("");
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HISTORY
+═══════════════════════════════════════════════════════════════ */
+function addHistory(data){
+  const crops = (data.detections||[]).filter(d => d.class_name === "crop").length;
+  const weeds = (data.detections||[]).filter(d => d.class_name === "weed").length;
+  const now   = new Date();
+  const label = now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+
+  S.historyStats.push({crops, weeds, label});
+  if (S.historyStats.length > 10) S.historyStats.shift();
+
+  S.history.unshift({
+    name:    S.file ? S.file.name : "unknown",
+    time:    label,
+    crops, weeds,
+    thumb:   S.annotatedSrc,
+    dets:    data.detections,
+    annotated: S.annotatedSrc,
+  });
+  if (S.history.length > 5) S.history.pop();
+
+  const hl = document.getElementById("historyList");
+  hl.innerHTML = S.history.map((h, i) => `
+    <div class="hist-item" onclick="loadHistory(${i})">
+      <div class="hist-thumb">${h.thumb ? `<img src="${h.thumb}">` : ""}</div>
+      <div class="hist-info">
+        <div class="hist-name">${h.name}</div>
+        <div class="hist-time">${h.time}</div>
+      </div>
+      <span class="hist-badge">${h.crops}C ${h.weeds}W</span>
+    </div>`).join("");
+}
+
+function loadHistory(i){
+  const h = S.history[i];
+  if (!h) return;
+  S.detections   = h.dets;
+  S.annotatedSrc = h.annotated;
+  if (h.annotated){
+    const img = new Image();
+    img.onload = () => { S.imgEl = img; showCanvas(); redraw(); };
+    img.src = h.annotated;
+  }
+  updateDetList();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EXPORT
+═══════════════════════════════════════════════════════════════ */
+function enableExport(){
+  ["dlImage","dlJSON","dlCSV","dlHeat"].forEach(id => document.getElementById(id).disabled = false);
+}
+
+function downloadAnnotated(){
+  if (!S.annotatedSrc) return;
+  const a = document.createElement("a");
+  a.download = "annotated.jpg"; a.href = S.annotatedSrc; a.click();
+}
+
+function downloadJSON(){
+  const payload = {
+    model:              document.getElementById("modelSel").value,
+    confidence_threshold: document.getElementById("confSlider").value / 100,
+    iou_threshold:      document.getElementById("iouSlider").value  / 100,
+    sahi_enabled:       document.getElementById("togSahi").checked,
+    slice_size:         parseInt(document.getElementById("sliceSlider").value),
+    overlap:            document.getElementById("overlapSlider").value / 100,
+    detections:         S.detections,
+  };
+  const a = document.createElement("a");
+  a.download = "detections.json";
+  a.href = "data:application/json," + encodeURIComponent(JSON.stringify(payload, null, 2));
+  a.click();
+}
+
+function downloadCSV(){
+  const rows = ["id,class,confidence,x,y,width,height",
+    ...S.detections.map(d =>
+      `${d.id},${d.class_name},${d.confidence.toFixed(3)},${d.x.toFixed(6)},${d.y.toFixed(6)},${d.w.toFixed(6)},${d.h.toFixed(6)}`)
+  ];
+  const a = document.createElement("a");
+  a.download = "detections.csv";
+  a.href = "data:text/csv," + encodeURIComponent(rows.join("\n"));
+  a.click();
+}
+
+function downloadHeatmap(){
+  const cv  = document.getElementById("mainCanvas");
+  const off = document.createElement("canvas");
+  off.width = cv.width; off.height = cv.height;
+  const ctx = off.getContext("2d");
+  ctx.drawImage(cv, 0, 0);
+  drawHeatmap(ctx, off.width, off.height, S.detections);
+  const a = document.createElement("a");
+  a.download = "heatmap.png"; a.href = off.toDataURL(); a.click();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ERROR BANNER
+═══════════════════════════════════════════════════════════════ */
+function showError(msg){
+  const b = document.getElementById("errorBanner");
+  if (!msg){ b.classList.remove("show"); return; }
+  document.getElementById("errorText").textContent = msg;
+  b.classList.add("show");
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BACKEND STATUS POLLING
+═══════════════════════════════════════════════════════════════ */
+async function checkStatus(){
+  const dot  = document.getElementById("statusDot");
+  const txt  = document.getElementById("statusText");
+  try {
+    const r = await fetch(BACKEND_URL + "/status", { signal: AbortSignal.timeout(3000) });
+    const d = await r.json();
+    dot.className  = "dot " + (d.online ? "online" : "offline");
+    txt.textContent = d.online ? "Backend online" : "Model not loaded";
+  } catch {
+    dot.className  = "dot offline";
+    txt.textContent = "Backend offline";
+  }
+}
+checkStatus();
+setInterval(checkStatus, 8000);
+
+/* Re-draw on slider change after inference */
+document.getElementById("confSlider").addEventListener("input", () => {
+  if (S.detections.length){ updateDetList(); redraw(); }
+});
+</script>
+</body>
+</html>
