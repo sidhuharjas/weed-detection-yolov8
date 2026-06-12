@@ -10,6 +10,10 @@ SETUP:
 # ─────────────────────────────────────────────────────────────────────────────
 import os
 
+# Fix for libGL.so.1 missing on headless servers (Render, Streamlit Cloud, etc.)
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "0"
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
 MODEL_PATH = "best.pt"
 
 CLASS_NAMES = {
@@ -57,36 +61,51 @@ app = Flask(__name__)
 CORS(app)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LOAD MODEL
+# LOAD MODEL (lazy — safe for gunicorn multi-worker)
 # ─────────────────────────────────────────────────────────────────────────────
 
-print(f"[AgroVision] Loading model: {MODEL_PATH}")
+detection_model = None
 
-try:
-    if USE_SAHI:
-        from sahi import AutoDetectionModel
-        from sahi.predict import get_sliced_prediction
+def load_model():
+    global detection_model
+    if detection_model is not None:
+        return detection_model
 
-        detection_model = AutoDetectionModel.from_pretrained(
-            model_type="yolov8",
-            model_path=MODEL_PATH,
-            confidence_threshold=DEFAULT_CONF,
-            device="cpu",
-        )
-        print("[AgroVision] SAHI + YOLOv8 model loaded.")
+    print(f"[AgroVision] Loading model: {MODEL_PATH}")
+    try:
+        if USE_SAHI:
+            from sahi import AutoDetectionModel
+            detection_model = AutoDetectionModel.from_pretrained(
+                model_type="yolov8",
+                model_path=MODEL_PATH,
+                confidence_threshold=DEFAULT_CONF,
+                device="cpu",
+            )
+            print("[AgroVision] SAHI + YOLOv8 model loaded.")
+        else:
+            from ultralytics import YOLO
+            detection_model = YOLO(MODEL_PATH)
+            print("[AgroVision] YOLOv8 model loaded (no SAHI).")
+    except Exception as e:
+        detection_model = None
+        print(f"[AgroVision] ERROR: Failed to load model — {e}")
 
-    else:
-        from ultralytics import YOLO
-        detection_model = YOLO(MODEL_PATH)
-        print("[AgroVision] YOLOv8 model loaded (no SAHI).")
+    return detection_model
 
-except Exception as e:
-    detection_model = None
-    print(f"[AgroVision] ERROR: Failed to load model — {e}")
+
+# Load on startup (works for both direct run and gunicorn)
+with app.app_context():
+    load_model()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ROUTES
 # ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/", methods=["GET"])
+def root():
+    return jsonify({"status": "AgroVision online", "model": MODEL_PATH})
+
 
 @app.route("/status", methods=["GET"])
 def status():
@@ -98,7 +117,9 @@ def status():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    if detection_model is None:
+    model = load_model()
+
+    if model is None:
         return jsonify({"error": f"Model not loaded. Check MODEL_PATH = '{MODEL_PATH}'"}), 500
 
     if "image" not in request.files:
@@ -122,9 +143,10 @@ def predict():
     # INFERENCE
     # ─────────────────────────────────────────────────────────────────────
     if USE_SAHI:
+        from sahi.predict import get_sliced_prediction
         result = get_sliced_prediction(
             image,
-            detection_model,
+            model,
             slice_height=slice_size,
             slice_width=slice_size,
             overlap_height_ratio=overlap,
@@ -152,7 +174,7 @@ def predict():
             })
 
     else:
-        results = detection_model(image, conf=conf, iou=iou)
+        results = model(image, conf=conf, iou=iou)
         for r in results:
             for box in r.boxes:
                 cls = int(box.cls[0])
@@ -187,7 +209,6 @@ def predict():
 
         draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
         label = f"{d['class_name']} {int(d['confidence']*100)}%"
-
         draw.rectangle([x1, y1 - 14, x1 + len(label) * 6 + 6, y1], fill=color)
         draw.text((x1 + 3, y1 - 13), label, fill="white")
 
@@ -208,10 +229,11 @@ def predict():
         "sahi_enabled": USE_SAHI,
     })
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     print(f"[AgroVision] Server running at http://{HOST}:{PORT}")
-    app.run(host="0.0.0.0", port=PORT)
+    app.run(host=HOST, port=PORT)
