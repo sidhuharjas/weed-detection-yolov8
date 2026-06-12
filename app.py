@@ -9,7 +9,7 @@ SETUP:
 # CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 
-MODEL_PATH = r"C:\Users\HARJAS\Downloads\agrovision\agrovision\best.pt"
+MODEL_PATH = "best.pt"
 
 CLASS_NAMES = {
     0: "crop",
@@ -23,7 +23,8 @@ DEFAULT_IOU         = 0.45
 USE_SAHI            = True
 
 HOST = "0.0.0.0"
-PORT = 5000
+PORT = int(os.environ.get("PORT", 5000))
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # IMPORTS
@@ -212,4 +213,4 @@ def predict():
 
 if __name__ == "__main__":
     print(f"[AgroVision] Server running at http://{HOST}:{PORT}")
-    app.run(host=HOST, port=PORT, debug=True)
+    app.run(host="0.0.0.0", port=PORT)
