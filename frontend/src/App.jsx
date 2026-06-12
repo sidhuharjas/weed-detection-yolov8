@@ -11,7 +11,9 @@ import Timeline from './components/Timeline';
 // Assuming you merged styles into a global file based on the previous step
 import './global.css'; 
 
-const BACKEND = '/api';
+// FIXED: Point directly to your Render backend
+const BACKEND = 'https://weeddetector2-2.onrender.com';
+
 
 export default function App() {
   // Settings
