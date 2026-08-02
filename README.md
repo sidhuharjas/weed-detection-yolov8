@@ -45,14 +45,14 @@ Three training rounds were run on the flagship (V3) dataset, evaluating after ea
 | mAP@0.5 | 0.642 |
 | mAP@0.5:0.95 | 0.409 |
 
-*(Best-performing checkpoint, selected by validation fitness during training — see [`results/results.csv`](results/results.csv) for the full per-epoch training log.)*
+*(Best-performing checkpoint, selected by validation fitness during training — see [`results/metrics/results.csv`](results/metrics/results.csv) for the full per-epoch training log.)*
 
 **Precision** matters because false positives waste spray on crops; **recall** matters because missed weeds don't get sprayed at all — both were tracked every epoch to catch tradeoffs between them.
 
-See [`results/`](results/) for full precision/recall/F1 curves, box/class loss curves, and confusion matrices (raw counts and normalized).
+See [`results/metrics/`](results/metrics/) for full precision/recall/F1 curves, box/class loss curves, and confusion matrices (raw counts and normalized).
 
-![Results](results/results.png)
-![Confusion Matrix](results/confusion_matrix.png)
+![Results](results/metrics/results.png)
+![Confusion Matrix](results/metrics/confusion_matrix.png)
 
 ## Web App
 
