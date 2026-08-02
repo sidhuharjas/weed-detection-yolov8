@@ -2,7 +2,9 @@
 
 A fine-tuned YOLOv8 model that detects weeds vs. crops in corn fields in real time, built to power targeted automated pesticide spraying instead of blanket application. Developed through the STEM Institute (SI) summer research program, using the Cardinal supercomputer at the Ohio Supercomputer Center, The Ohio State University.
 
-<img src="https://github.com/user-attachments/assets/REPLACE_WITH_YOUR_VIDEO_ASSET_ID">
+## Project Demo
+<video src="demo.mp4" width="100%" controls autoplay muted></video>
+
 
 If the embed does not load, <a href="./demo.mp4">download/watch the demo</a>.
 
