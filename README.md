@@ -2,17 +2,17 @@
 
 A fine-tuned YOLOv8 model that detects weeds vs. crops in corn fields in real time, built to power targeted automated pesticide spraying instead of blanket application. Developed through the STEM Institute (SI) summer research program, using the Cardinal supercomputer at the Ohio Supercomputer Center, The Ohio State University.
 
-![Demo](demo.mp4)
+## Project Demo
+<p align="center">
+  <img src="demo.gif" alt="Weed Detection Project Demo" width="150%">
+</p>
+
 
 ## Why This Matters
 
 Blanket pesticide spraying wastes chemicals and pollutes runoff. Automated, targeted spraying — only hitting the weeds, not the crops — can cut pesticide use by an estimated 70% in real deployments. Building the detection layer that makes targeted spraying possible is what this project does.
 
 A standard, pretrained YOLO model was tested on real field images first — it frequently missed or misclassified weeds. Off-the-shelf object detection isn't built for this task; it needs fine-tuning on a dedicated weed-vs-crop dataset, which is what this project delivers.
-
-## My Role
-
-I led model development end-to-end: evaluating dataset options, diagnosing why early dataset versions failed, designing the data curation and augmentation strategy, structuring training runs on the Cardinal supercomputer, and building the evaluation framework (confusion matrix, precision, recall, F1, loss curves). Field data collection — mounting GoPro cameras on an ATV and driving through corn fields — was a team effort; the model and training pipeline are mine.
 
 ## Data Pipeline
 
@@ -56,7 +56,7 @@ See [`results/metrics/`](results/metrics/) for full precision/recall/F1 curves, 
 
 ## Web App
 
-The final deliverable: upload an image or video of a field and get back real-time detections — bounding boxes, class labels, and confidence scores, the same output format an automated sprayer would use to decide where to spray.
+The final deliverable: upload an image or video of a field and get back real-time detections — bounding boxes, class labels, and confidence scores, the same output format an automated sprayer would use.
 
 - **Backend:** Flask, YOLOv8 inference with SAHI (Slicing Aided Hyper Inference) for better detection of small objects in high-resolution field images
 - **Frontend:** HTML/CSS/JS
@@ -91,7 +91,7 @@ The sidebar status indicator turns green once connected to the backend.
 Training data combined three sources across dataset iterations:
 
 - **V2 dataset:** [CropWeeds-YOLO Dataset](https://www.kaggle.com/datasets/swish9/weeds-detection) (Kaggle, swish9) — pre-annotated crop/weed images used for the second dataset iteration.
-- **V3 (flagship) dataset:** custom field data collected firsthand (GoPro/ATV corn field footage), combined and rebalanced with external annotated data, including the **Dataset of Annotated Food Crops and Weed Images** (Sudars et al., 2020), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0):
+- **V3 (flagship) dataset:** custom field data collected firsthand (GoPro/ATV corn field footage), combined and rebalanced with external annotated data, including the **Dataset of Annotated Food Crops and Weed Images**:
 
 ```
 Sudars, K., Jasko, J., Namatevs, I., Ozola, L., & Badaukis, N. (2020).
@@ -105,7 +105,7 @@ Trained weights (`best.pt`) are not published in this public repo. Reach out if 
 
 ## Acknowledgments
 
-Developed through the STEM Institute (SI) summer research program with access to the Cardinal supercomputer at the Ohio Supercomputer Center, The Ohio State University. Field data collection was a team effort; model development, training, and evaluation were led by me.
+Developed through the STEM Institute (SI) summer research program with access to the Cardinal supercomputer at the Ohio Supercomputer Center, The Ohio State University. Field data collection was a team effort.
 
 ## Author
 
