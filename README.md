@@ -14,10 +14,6 @@ Blanket pesticide spraying wastes chemicals and pollutes runoff. Automated, targ
 
 A standard, pretrained YOLO model was tested on real field images first — it frequently missed or misclassified weeds. Off-the-shelf object detection isn't built for this task; it needs fine-tuning on a dedicated weed-vs-crop dataset, which is what this project delivers.
 
-## My Role
-
-I led model development end-to-end: evaluating dataset options, diagnosing why early dataset versions failed, designing the data curation and augmentation strategy, structuring training runs on the Cardinal supercomputer, and building the evaluation framework (confusion matrix, precision, recall, F1, loss curves). Field data collection — mounting GoPro cameras on an ATV and driving through corn fields — was a team effort; the model and training pipeline are mine.
-
 ## Data Pipeline
 
 Good data was the hardest part of this project — harder than the model itself. It took three full dataset iterations before landing on one that actually worked.
