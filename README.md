@@ -2,7 +2,10 @@
 
 A fine-tuned YOLOv8 model that detects weeds vs. crops in corn fields in real time, built to power targeted automated pesticide spraying instead of blanket application. Developed through the STEM Institute (SI) summer research program, using the Cardinal supercomputer at the Ohio Supercomputer Center, The Ohio State University.
 
-![Demo](demo.mp4)
+<video controls width="100%">
+  <source src="demo.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 
 ## Why This Matters
 
@@ -56,7 +59,7 @@ See [`results/metrics/`](results/metrics/) for full precision/recall/F1 curves, 
 
 ## Web App
 
-The final deliverable: upload an image or video of a field and get back real-time detections — bounding boxes, class labels, and confidence scores, the same output format an automated sprayer would use to decide where to spray.
+The final deliverable: upload an image or video of a field and get back real-time detections — bounding boxes, class labels, and confidence scores, the same output format an automated sprayer would use.
 
 - **Backend:** Flask, YOLOv8 inference with SAHI (Slicing Aided Hyper Inference) for better detection of small objects in high-resolution field images
 - **Frontend:** HTML/CSS/JS
@@ -91,7 +94,7 @@ The sidebar status indicator turns green once connected to the backend.
 Training data combined three sources across dataset iterations:
 
 - **V2 dataset:** [CropWeeds-YOLO Dataset](https://www.kaggle.com/datasets/swish9/weeds-detection) (Kaggle, swish9) — pre-annotated crop/weed images used for the second dataset iteration.
-- **V3 (flagship) dataset:** custom field data collected firsthand (GoPro/ATV corn field footage), combined and rebalanced with external annotated data, including the **Dataset of Annotated Food Crops and Weed Images** (Sudars et al., 2020), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0):
+- **V3 (flagship) dataset:** custom field data collected firsthand (GoPro/ATV corn field footage), combined and rebalanced with external annotated data, including the **Dataset of Annotated Food Crops and Weed Images**:
 
 ```
 Sudars, K., Jasko, J., Namatevs, I., Ozola, L., & Badaukis, N. (2020).
@@ -105,7 +108,7 @@ Trained weights (`best.pt`) are not published in this public repo. Reach out if 
 
 ## Acknowledgments
 
-Developed through the STEM Institute (SI) summer research program with access to the Cardinal supercomputer at the Ohio Supercomputer Center, The Ohio State University. Field data collection was a team effort; model development, training, and evaluation were led by me.
+Developed through the STEM Institute (SI) summer research program with access to the Cardinal supercomputer at the Ohio Supercomputer Center, The Ohio State University. Field data collection was a team effort.
 
 ## Author
 
