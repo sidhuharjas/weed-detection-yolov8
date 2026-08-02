@@ -4,7 +4,7 @@ A fine-tuned YOLOv8 model that detects weeds vs. crops in corn fields in real ti
 
 ## Project Demo
 <p align="center">
-  <img src="demo.gif" alt="Weed Detection Project Demo" width="100%">
+  <img src="demo.gif" alt="Weed Detection Project Demo" width="150%">
 </p>
 
 
